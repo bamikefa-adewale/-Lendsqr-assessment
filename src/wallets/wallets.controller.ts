@@ -16,11 +16,11 @@ import { FundWalletDto } from './dto/fund-wallet.dto';
 import { TransferWalletDto } from './dto/transfer-wallet.dto';
 import { WithdrawWalletDto } from './dto/withdraw-wallet.dto';
 import {
-  ErrorResponseSwaggerDto,
   FundWalletSuccessSwaggerDto,
   TransferWalletSuccessSwaggerDto,
   WithdrawWalletSuccessSwaggerDto,
 } from './dto/wallets-swagger.dto';
+import { ErrorResponseSwaggerDto } from '../common/dto/error-response-swagger.dto';
 import { WalletsService } from './providers/wallets.service';
 
 @ApiTags('wallets')

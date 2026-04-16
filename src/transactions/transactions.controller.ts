@@ -16,10 +16,10 @@ import { GetUserId } from '../auth/decorators/user.decorator';
 import { AuthType } from '../auth/enums/auth-types.enum';
 import { ListTransactionsQueryDto } from './dto/list-transactions-query.dto';
 import {
-  ErrorResponseSwaggerDto,
   GetTransactionSuccessSwaggerDto,
   ListTransactionsSuccessSwaggerDto,
 } from './dto/transactions-swagger.dto';
+import { ErrorResponseSwaggerDto } from '../common/dto/error-response-swagger.dto';
 import { TransactionType } from './enums/transaction-type.enum';
 import { TransactionsService } from './transactions.service';
 

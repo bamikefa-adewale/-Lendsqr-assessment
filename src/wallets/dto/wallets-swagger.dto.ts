@@ -72,22 +72,3 @@ export class TransferWalletSuccessSwaggerDto {
   data: TransferWalletDataSwaggerDto;
 }
 
-export class ErrorResponseSwaggerDto {
-  @ApiProperty({ example: 400 })
-  statusCode: number;
-
-  @ApiProperty({
-    oneOf: [
-      { type: 'string', example: 'Validation failed' },
-      {
-        type: 'array',
-        items: { type: 'string' },
-        example: ['amount must not be less than 0.01'],
-      },
-    ],
-  })
-  message: string | string[];
-
-  @ApiProperty({ example: 'Bad Request' })
-  error: string;
-}

@@ -1,0 +1,35 @@
+@baseUrl = http://localhost:1010/api/v1
+@token = <your_access_token_here>
+
+### Fund wallet
+POST {{baseUrl}}/wallets/fund
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "amount": 1000,
+  "description": "Wallet top up via transfer"
+}
+
+
+###
+
+### Withdraw wallet
+POST {{baseUrl}}/wallets/withdraw
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "amount": 500,
+  "description": "Bill payment"
+}
+
+###
+
+### Transfer wallet
+POST {{baseUrl}}/wallets/transfer
+Authorization: Bearer {{token}}
+Content-Type: application/json
+{
+  "recipientUserId": "2ec67438-ff0e-40be-ba72-85356638df6d",
+  "amount": 300,
+  "description": "Repayment transfer"
+}

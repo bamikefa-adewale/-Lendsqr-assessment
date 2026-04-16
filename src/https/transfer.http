@@ -1,0 +1,12 @@
+
+###
+
+### Transfer wallet
+POST http://localhost:1010/api/v1/wallets/transfer
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZTcwNTI4MC0zN2IzLTQzMzUtOWRjNC1jNGMwY2ExYzA0MTgiLCJlbWFpbCI6Im9sYW1pbGVrYW4udGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTc3NjMyOTE0MCwiZXhwIjoxNzc2NDE1NTQwLCJhdWQiOiJsb2NhbGhvc3Q6MTAxMCIsImlzcyI6ImxvY2FsaG9zdDoxMDEwIn0.dtRZpjU3YqhteyCFn69DwQubhsoZ0Ju12HUbbX-l2cc
+Content-Type: application/json
+{
+  "recipientUserId": "1971f8a9-b7e8-47b5-828c-3c4b7e6f83a7",
+  "amount": 1000,
+  "description": "Repayment transfer"
+}

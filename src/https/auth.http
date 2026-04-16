@@ -1,0 +1,27 @@
+
+### Register (creates user + wallet, returns accessToken)
+POST http://localhost:1010/api/v1/auth/register
+Content-Type: application/json
+
+{
+
+  "firstName": "felix",
+  "lastName": "felix",
+ "email": "felix.test@example.com",
+  "phoneNumber": "+2348012395679",
+  "password": "hunter2hunter2"
+}
+
+### Login
+POST http://localhost:1010/api/v1/auth/login
+Content-Type: application/json
+
+{
+  //  "email": "ada@example.com",
+   "email": "olamilekan.test@example.com",
+  "password": "hunter2hunter2"
+}
+
+### Current user (set accessToken in http-client.env.json)
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{accessToken}}

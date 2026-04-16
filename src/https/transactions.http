@@ -1,0 +1,23 @@
+@baseUrl = 
+@token = <your_access_token_here>
+
+### Get all user transactions
+GET http://localhost:1010/api/v1/transactions?page=1&limit=20
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxOTcxZjhhOS1iN2U4LTQ3YjUtODI4Yy0zYzRiN2U2ZjgzYTciLCJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSIsImlhdCI6MTc3NjMzODc3MSwiZXhwIjoxNzc2NDI1MTcxLCJhdWQiOiJsb2NhbGhvc3Q6MTAxMCIsImlzcyI6ImxvY2FsaG9zdDoxMDEwIn0.0oKojFVzrUbKcF2NXuuI_Kq_sGPMDh9lXCl7GDbJ2NY
+###
+
+### Get all transfer-out transactions for user
+GET {{baseUrl}}/transactions?type=transfer_out&page=1&limit=20
+Authorization: Bearer {{token}}
+
+###
+
+### Get all transfer-in transactions for user
+GET {{baseUrl}}/transactions?type=transfer_in&page=1&limit=20
+Authorization: Bearer {{token}}
+
+###
+
+### Get one transaction by reference
+GET {{baseUrl}}/transactions/<transaction_reference_here>
+Authorization: Bearer {{token}}

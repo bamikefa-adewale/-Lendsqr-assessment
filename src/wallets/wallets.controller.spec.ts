@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { WalletsController } from './wallets.controller';
 import { WalletsService } from './providers/wallets.service';
 
@@ -36,12 +37,13 @@ describe('WalletsController', () => {
     const response = await controller.fundWallet('user-1', {
       amount: 500,
       description: 'Top up',
-    });
+    }, 'fund-key-1');
 
     expect(walletsService.fundWallet).toHaveBeenCalledWith(
       'user-1',
       500,
       'Top up',
+      'fund-key-1',
     );
     expect(response).toEqual({
       success: true,
@@ -66,12 +68,13 @@ describe('WalletsController', () => {
     const response = await controller.withdrawWallet('user-1', {
       amount: 500,
       description: 'Bill payment',
-    });
+    }, 'withdraw-key-1');
 
     expect(walletsService.withdrawWallet).toHaveBeenCalledWith(
       'user-1',
       500,
       'Bill payment',
+      'withdraw-key-1',
     );
     expect(response).toEqual({
       success: true,
@@ -106,13 +109,14 @@ describe('WalletsController', () => {
       recipientUserId: 'user-2',
       amount: 500,
       description: 'Repayment',
-    });
+    }, 'transfer-key-1');
 
     expect(walletsService.transferWallet).toHaveBeenCalledWith(
       'user-1',
       'user-2',
       500,
       'Repayment',
+      'transfer-key-1',
     );
     expect(response).toEqual({
       success: true,
@@ -133,5 +137,18 @@ describe('WalletsController', () => {
         },
       },
     });
+  });
+
+  it('requires idempotency key header for mutations', async () => {
+    await expect(
+      controller.fundWallet(
+        'user-1',
+        {
+          amount: 500,
+          description: 'Top up',
+        },
+        undefined,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

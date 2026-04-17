@@ -106,6 +106,7 @@ Transfers write two ledger rows, one for debit and one for credit, linked by a s
 - Sufficient balance checks for withdraw and transfer
 - Self-transfer prevention
 - Unique transaction references via `randomUUID()`
+- Idempotent wallet mutations through required `Idempotency-Key` header
 - Database transaction scoping for wallet mutations
 - Row-level locking with `FOR UPDATE`
 
@@ -221,9 +222,9 @@ Create the required environment variables for:
 - `JWT_ACCESS_TOKEN_TTL`
 - `JWT_REFRESH_TOKEN_TTL`
 - `KARMA_PROVIDER`
-- `KARMA_MOCK_BLACKLISTED_EMAILS`
-- `ADJUTOR_API_URL`
-- `ADJUTOR_API_KEY`
+- `KARMA_BASE_URL`
+- `KARMA_APP_ID`
+- `KARMA_API_KEY`
 
 ## Run The Project
 
@@ -250,11 +251,21 @@ npm test -- wallets.service.spec.ts wallets.controller.spec.ts
 - The blacklist lookup is performed using the user email.
 - Amount precision is limited to two decimal places.
 - JWT bearer-token authentication is sufficient for the scope of this assessment.
-- When `KARMA_PROVIDER=mock`, blacklisted users are simulated through configured emails.
+- Onboarding uses Adjutor Karma to determine blacklist eligibility.
+
+## Karma Identity Encoding Note
+
+Adjutor Karma identity checks use the identity in the URL path segment. Because emails may contain URL-reserved characters (for example `+`, `@`, `%`, `/`, `?`, `#`), the identity is URL-encoded before sending the request. This ensures the server receives the exact email value as one safe path segment.
+
+Example:
+
+- Raw: `john+test@gmail.com`
+- Safe in path: `john%2Btest%40gmail.com`
+
+If encoding is skipped, the provider can parse the identity incorrectly, which may lead to wrong lookup results or `4xx` responses.
 
 ## Known Limitations / Future Improvements
 
-- Idempotency keys are not yet implemented for retry-safe wallet mutation requests.
 - Transfer lock ordering can be improved further to reduce deadlock risk under very high contention.
 - A full production authentication and authorization model is outside the current assessment scope.
 - README placeholders still need actual submission links before final delivery.

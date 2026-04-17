@@ -1,8 +1,9 @@
-import { Body, Controller, Logger, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Headers, Logger, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -31,6 +32,14 @@ export class WalletsController {
 
   constructor(private readonly walletsService: WalletsService) {}
 
+  private extractIdempotencyKey(idempotencyKey?: string): string {
+    const normalized = idempotencyKey?.trim();
+    if (!normalized) {
+      throw new BadRequestException('Idempotency-Key header is required');
+    }
+    return normalized;
+  }
+
   @Post('fund')
   @Auth(AuthType.Bearer)
   @ApiOperation({
@@ -38,6 +47,12 @@ export class WalletsController {
     description: 'Adds money to the authenticated user wallet balance.',
   })
   @ApiBody({ type: FundWalletDto })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Unique key per mutation request. Reuse same key to safely retry without duplicate processing.',
+  })
   @ApiOkResponse({
     description: 'Wallet funded successfully',
     type: FundWalletSuccessSwaggerDto,
@@ -54,7 +69,12 @@ export class WalletsController {
     description: 'Missing or invalid bearer token',
     type: ErrorResponseSwaggerDto,
   })
-  async fundWallet(@GetUserId() userId: string, @Body() dto: FundWalletDto) {
+  async fundWallet(
+    @GetUserId() userId: string,
+    @Body() dto: FundWalletDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const requestIdempotencyKey = this.extractIdempotencyKey(idempotencyKey);
     this.logger.log(
       `Fund wallet request received for userId: ${userId}, amount: ${dto.amount}`,
     );
@@ -62,6 +82,7 @@ export class WalletsController {
       userId,
       dto.amount,
       dto.description,
+      requestIdempotencyKey,
     );
     this.logger.log(`Wallet funded successfully for userId: ${userId}`);
 
@@ -79,6 +100,12 @@ export class WalletsController {
     description: 'Debits money from the authenticated user wallet balance.',
   })
   @ApiBody({ type: WithdrawWalletDto })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Unique key per mutation request. Reuse same key to safely retry without duplicate processing.',
+  })
   @ApiOkResponse({
     description: 'Wallet withdrawn successfully',
     type: WithdrawWalletSuccessSwaggerDto,
@@ -98,7 +125,9 @@ export class WalletsController {
   async withdrawWallet(
     @GetUserId() userId: string,
     @Body() dto: WithdrawWalletDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
+    const requestIdempotencyKey = this.extractIdempotencyKey(idempotencyKey);
     this.logger.log(
       `Withdraw wallet request received for userId: ${userId}, amount: ${dto.amount}`,
     );
@@ -106,6 +135,7 @@ export class WalletsController {
       userId,
       dto.amount,
       dto.description,
+      requestIdempotencyKey,
     );
     this.logger.log(`Wallet withdrawn successfully for userId: ${userId}`);
 
@@ -124,6 +154,12 @@ export class WalletsController {
       'Transfers money from the authenticated user wallet to another user wallet.',
   })
   @ApiBody({ type: TransferWalletDto })
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description:
+      'Unique key per mutation request. Reuse same key to safely retry without duplicate processing.',
+  })
   @ApiOkResponse({
     description: 'Transfer completed successfully',
     type: TransferWalletSuccessSwaggerDto,
@@ -143,7 +179,9 @@ export class WalletsController {
   async transferWallet(
     @GetUserId() userId: string,
     @Body() dto: TransferWalletDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
   ) {
+    const requestIdempotencyKey = this.extractIdempotencyKey(idempotencyKey);
     this.logger.log(
       `Transfer request received from userId: ${userId} to recipientUserId: ${dto.recipientUserId}, amount: ${dto.amount}`,
     );
@@ -152,6 +190,7 @@ export class WalletsController {
       dto.recipientUserId,
       dto.amount,
       dto.description,
+      requestIdempotencyKey,
     );
     this.logger.log(
       `Transfer completed successfully from userId: ${userId} to recipientUserId: ${dto.recipientUserId}`,

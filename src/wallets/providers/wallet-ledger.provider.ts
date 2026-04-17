@@ -4,10 +4,13 @@ import { Knex } from 'knex';
 import { KNEX_CONNECTION } from '../../database/database.constants';
 import { FundWalletResult } from '../interfaces/fund-wallet-result.interface';
 import { WalletRow } from '../interfaces/wallet-row.interface';
+import { TransactionRow } from '../../transactions/interfaces/transaction-row.interface';
+import { TransactionType } from '../../transactions/enums/transaction-type.enum';
+import { TransactionStatus } from '../../transactions/enums/transaction-status.enum';
 
 export type WalletMutation = {
   nextBalance: number;
-  transactionType: 'fund' | 'withdraw';
+  transactionType: TransactionType.FUND | TransactionType.WITHDRAW;
 };
 
 @Injectable()
@@ -19,11 +22,13 @@ export class WalletLedgerProvider {
     userId,
     amount,
     description,
+    idempotencyKey,
     mutate,
   }: {
     userId: string;
     amount: number;
     description?: string;
+    idempotencyKey: string;
     mutate: (wallet: WalletRow, amount: number) => WalletMutation;
   }): Promise<FundWalletResult> {
     return this.knex.transaction(async (trx) => {
@@ -36,8 +41,31 @@ export class WalletLedgerProvider {
         throw new NotFoundException('Wallet not found for user');
       }
 
-      const previousBalance = Number(lockedWallet.balance);
       const { nextBalance, transactionType } = mutate(lockedWallet, amount);
+      const existingTransaction =
+        await this.findWalletTransactionByIdempotencyKey(
+          trx,
+          lockedWallet.id,
+          transactionType,
+          idempotencyKey,
+        );
+
+      if (existingTransaction) {
+        const existingAmount = Number(existingTransaction.amount);
+        const currentBalance = Number(lockedWallet.balance);
+        const previousBalance =
+          existingTransaction.type === TransactionType.FUND
+            ? currentBalance - existingAmount
+            : currentBalance + existingAmount;
+        return {
+          walletId: lockedWallet.id,
+          previousBalance,
+          currentBalance,
+          transactionReference: existingTransaction.reference,
+        };
+      }
+
+      const previousBalance = Number(lockedWallet.balance);
       const transactionReference = randomUUID();
 
       await this.updateWalletBalance(trx, lockedWallet.id, nextBalance);
@@ -45,8 +73,9 @@ export class WalletLedgerProvider {
         wallet_id: lockedWallet.id,
         type: transactionType,
         amount,
-        status: 'success',
+        status: TransactionStatus.SUCCESS,
         reference: transactionReference,
+        idempotency_key: idempotencyKey,
         description: description?.trim() || null,
       });
 
@@ -82,14 +111,42 @@ export class WalletLedgerProvider {
     });
   }
 
+  async findWalletTransactionByIdempotencyKey(
+    trx: Knex.Transaction,
+    walletId: string,
+    type: TransactionType,
+    idempotencyKey: string,
+  ): Promise<TransactionRow | undefined> {
+    return trx<TransactionRow>('transactions')
+      .where({
+        wallet_id: walletId,
+        type,
+        idempotency_key: idempotencyKey,
+      })
+      .first();
+  }
+
+  async findTransferInByGroupId(
+    trx: Knex.Transaction,
+    groupId: string,
+  ): Promise<TransactionRow | undefined> {
+    return trx<TransactionRow>('transactions')
+      .where({
+        group_id: groupId,
+        type: TransactionType.TRANSFER_IN,
+      })
+      .first();
+  }
+
   async insertTransaction(
     trx: Knex.Transaction,
     payload: {
       wallet_id: string;
-      type: 'fund' | 'withdraw' | 'transfer_in' | 'transfer_out';
+      type: TransactionType;
       amount: number;
-      status: 'pending' | 'success' | 'failed';
+      status: TransactionStatus;
       reference: string;
+      idempotency_key?: string;
       description?: string | null;
       related_wallet_id?: string;
       group_id?: string;

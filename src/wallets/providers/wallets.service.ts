@@ -14,6 +14,9 @@ import { WithdrawWalletResult } from '../interfaces/withdraw-wallet-result.inter
 import { TransferWalletResult } from '../interfaces/transfer-wallet-result.interface';
 import { WalletLedgerProvider } from './wallet-ledger.provider';
 import { WalletValidationProvider } from './wallet-validation.provider';
+import { TransactionRow } from '../../transactions/interfaces/transaction-row.interface';
+import { TransactionType } from '../../transactions/enums/transaction-type.enum';
+import { TransactionStatus } from '../../transactions/enums/transaction-status.enum';
 
 @Injectable()
 export class WalletsService {
@@ -55,19 +58,22 @@ export class WalletsService {
     userId: string,
     amount: number,
     description?: string,
+    idempotencyKey?: string,
   ): Promise<FundWalletResult> {
     try {
       this.walletValidation.ensureAmountIsValid(amount);
+      const safeIdempotencyKey = this.ensureIdempotencyKey(idempotencyKey);
 
       return this.walletLedger.executeWalletBalanceOperation({
         userId,
         amount,
         description,
+        idempotencyKey: safeIdempotencyKey,
         mutate: (wallet, value) => {
           this.walletValidation.ensureWalletIsActive(wallet);
           return {
             nextBalance: Number(wallet.balance) + value,
-            transactionType: 'fund',
+            transactionType: TransactionType.FUND,
           };
         },
       });
@@ -81,14 +87,17 @@ export class WalletsService {
     userId: string,
     amount: number,
     description?: string,
+    idempotencyKey?: string,
   ): Promise<WithdrawWalletResult> {
     try {
       this.walletValidation.ensureAmountIsValid(amount);
+      const safeIdempotencyKey = this.ensureIdempotencyKey(idempotencyKey);
 
       return this.walletLedger.executeWalletBalanceOperation({
         userId,
         amount,
         description,
+        idempotencyKey: safeIdempotencyKey,
         mutate: (wallet, value) => {
           this.walletValidation.ensureWalletIsActive(wallet);
 
@@ -99,7 +108,7 @@ export class WalletsService {
 
           return {
             nextBalance: balance - value,
-            transactionType: 'withdraw',
+            transactionType: TransactionType.WITHDRAW,
           };
         },
       });
@@ -114,9 +123,11 @@ export class WalletsService {
     recipientUserId: string,
     amount: number,
     description?: string,
+    idempotencyKey?: string,
   ): Promise<TransferWalletResult> {
     try {
       this.walletValidation.ensureAmountIsValid(amount);
+      const safeIdempotencyKey = this.ensureIdempotencyKey(idempotencyKey);
       if (!recipientUserId?.trim()) {
         throw new BadRequestException('Recipient user id is required');
       }
@@ -143,6 +154,23 @@ export class WalletsService {
 
         this.walletValidation.ensureWalletIsActive(senderWallet);
         this.walletValidation.ensureWalletIsActive(recipientWallet);
+
+        const existingTransferOut =
+          await this.walletLedger.findWalletTransactionByIdempotencyKey(
+            trx,
+            senderWallet.id,
+            TransactionType.TRANSFER_OUT,
+            safeIdempotencyKey,
+          );
+
+        if (existingTransferOut) {
+          return this.buildIdempotentTransferResult(
+            trx,
+            senderWallet,
+            recipientWallet,
+            existingTransferOut,
+          );
+        }
 
         const senderPreviousBalance = Number(senderWallet.balance);
         const recipientPreviousBalance = Number(recipientWallet.balance);
@@ -171,22 +199,24 @@ export class WalletsService {
         await this.walletLedger.insertTransaction(trx, {
           wallet_id: senderWallet.id,
           related_wallet_id: recipientWallet.id,
-          type: 'transfer_out',
+          type: TransactionType.TRANSFER_OUT,
           amount,
-          status: 'success',
+          status: TransactionStatus.SUCCESS,
           reference: transferOutReference,
           group_id: transferGroupId,
+          idempotency_key: safeIdempotencyKey,
           description: description?.trim() || null,
         });
 
         await this.walletLedger.insertTransaction(trx, {
           wallet_id: recipientWallet.id,
           related_wallet_id: senderWallet.id,
-          type: 'transfer_in',
+          type: TransactionType.TRANSFER_IN,
           amount,
-          status: 'success',
+          status: TransactionStatus.SUCCESS,
           reference: transferInReference,
           group_id: transferGroupId,
+          idempotency_key: safeIdempotencyKey,
           description: description?.trim() || null,
         });
 
@@ -209,5 +239,49 @@ export class WalletsService {
     } catch (error) {
       this.serviceErrorHandler.handleServiceError('transfer wallet', error);
     }
+  }
+
+  private ensureIdempotencyKey(idempotencyKey?: string): string {
+    const normalized = idempotencyKey?.trim();
+    if (!normalized) {
+      throw new BadRequestException('Idempotency key is required');
+    }
+    return normalized;
+  }
+
+  private async buildIdempotentTransferResult(
+    trx: Knex.Transaction,
+    senderWallet: WalletRow,
+    recipientWallet: WalletRow,
+    transferOut: TransactionRow,
+  ): Promise<TransferWalletResult> {
+    const transferIn = await this.walletLedger.findTransferInByGroupId(
+      trx,
+      transferOut.group_id ?? '',
+    );
+
+    if (!transferOut.group_id || !transferIn) {
+      throw new BadRequestException('Transfer idempotency record is incomplete');
+    }
+
+    const amount = Number(transferOut.amount);
+    const senderCurrentBalance = Number(senderWallet.balance);
+    const recipientCurrentBalance = Number(recipientWallet.balance);
+
+    return {
+      transferGroupId: transferOut.group_id,
+      sender: {
+        walletId: senderWallet.id,
+        previousBalance: senderCurrentBalance + amount,
+        currentBalance: senderCurrentBalance,
+        transactionReference: transferOut.reference,
+      },
+      recipient: {
+        walletId: recipientWallet.id,
+        previousBalance: recipientCurrentBalance - amount,
+        currentBalance: recipientCurrentBalance,
+        transactionReference: transferIn.reference,
+      },
+    };
   }
 }

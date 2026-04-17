@@ -18,16 +18,8 @@ export default Joi.object({
   JWT_REFRESH_TOKEN_TTL: Joi.number().required(),
 
   // Karma / Adjutor (onboarding blacklist)
-  KARMA_PROVIDER: Joi.string().valid('mock', 'adjutor').default('mock'),
-  KARMA_MOCK_BLACKLISTED_EMAILS: Joi.string().allow('').optional(),
-  ADJUTOR_API_URL: Joi.when('KARMA_PROVIDER', {
-    is: 'adjutor',
-    then: Joi.string().uri().required(),
-    otherwise: Joi.string().uri().allow('').optional(),
-  }),
-  ADJUTOR_API_KEY: Joi.when('KARMA_PROVIDER', {
-    is: 'adjutor',
-    then: Joi.string().required(),
-    otherwise: Joi.string().allow('').optional(),
-  }),
+  KARMA_PROVIDER: Joi.string().valid('adjutor').default('adjutor'),
+  KARMA_BASE_URL: Joi.string().uri().default('https://adjutor.lendsqr.com'),
+  KARMA_APP_ID: Joi.string().required(),
+  KARMA_API_KEY: Joi.string().required(),
 });

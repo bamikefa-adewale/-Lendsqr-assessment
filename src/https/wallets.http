@@ -4,6 +4,7 @@
 ### Fund wallet
 POST {{baseUrl}}/wallets/fund
 Authorization: Bearer {{token}}
+Idempotency-Key: wallet-fund-001
 Content-Type: application/json
 {
   "amount": 1000,
@@ -16,6 +17,7 @@ Content-Type: application/json
 ### Withdraw wallet
 POST {{baseUrl}}/wallets/withdraw
 Authorization: Bearer {{token}}
+Idempotency-Key: wallet-withdraw-001
 Content-Type: application/json
 {
   "amount": 500,
@@ -27,6 +29,7 @@ Content-Type: application/json
 ### Transfer wallet
 POST {{baseUrl}}/wallets/transfer
 Authorization: Bearer {{token}}
+Idempotency-Key: wallet-transfer-001
 Content-Type: application/json
 {
   "recipientUserId": "2ec67438-ff0e-40be-ba72-85356638df6d",

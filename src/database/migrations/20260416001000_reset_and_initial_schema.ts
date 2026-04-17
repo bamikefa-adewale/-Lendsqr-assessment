@@ -50,6 +50,7 @@ export async function up(knex: Knex): Promise<void> {
       .notNullable()
       .defaultTo('pending');
     table.string('reference', 191).notNullable().unique();
+    table.string('idempotency_key', 191).nullable();
     table
       .uuid('related_wallet_id')
       .nullable()
@@ -60,6 +61,7 @@ export async function up(knex: Knex): Promise<void> {
     table.timestamps(true, true);
 
     table.index(['wallet_id']);
+    table.unique(['wallet_id', 'type', 'idempotency_key']);
   });
 }
 

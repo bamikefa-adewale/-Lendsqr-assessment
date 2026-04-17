@@ -24,6 +24,7 @@ export class UserService {
   async createWithWallet(
     dto: CreateUserDto,
     passwordHash: string,
+    isBlacklisted = false,
   ): Promise<UserRow> {
     try {
       const userId = randomUUID();
@@ -38,7 +39,7 @@ export class UserService {
           first_name: dto.firstName.trim(),
           last_name: dto.lastName.trim(),
           password_hash: passwordHash,
-          is_blacklisted: false,
+          is_blacklisted: isBlacklisted,
         });
         //this method will create a wallet for the user
         await this.walletsService.createWalletForUser(userId, trx);

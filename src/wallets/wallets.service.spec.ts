@@ -17,11 +17,14 @@ describe('WalletsService', () => {
   let updateMock: jest.Mock;
   let insertMock: jest.Mock;
   let lockedWalletQueue: Array<unknown>;
+  let transactionWhereMock: jest.Mock;
+  let idempotentTransactionQueue: Array<unknown>;
 
   beforeEach(() => {
     updateMock = jest.fn().mockResolvedValue(1);
     insertMock = jest.fn().mockResolvedValue([1]);
     lockedWalletQueue = [];
+    idempotentTransactionQueue = [];
 
     forUpdateMock = jest.fn(() => ({
       first: jest.fn().mockResolvedValue(lockedWalletQueue.shift()),
@@ -35,12 +38,16 @@ describe('WalletsService', () => {
       }
       throw new Error('Unexpected where criteria');
     });
+    transactionWhereMock = jest.fn(() => ({
+      first: jest.fn().mockResolvedValue(idempotentTransactionQueue.shift()),
+    }));
+
     trxMock = jest.fn((table: string) => {
       if (table === 'wallets') {
         return { where: trxWhereMock };
       }
       if (table === 'transactions') {
-        return { insert: insertMock };
+        return { insert: insertMock, where: transactionWhereMock };
       }
       throw new Error(`Unexpected table: ${table}`);
     }) as unknown as jest.Mock & { fn: { now: jest.Mock } };
@@ -74,7 +81,7 @@ describe('WalletsService', () => {
       status: 'active',
     });
 
-    const result = await service.fundWallet('user-1', 500, 'Top up');
+    const result = await service.fundWallet('user-1', 500, 'Top up', 'fund-key-1');
 
     expect(result.walletId).toBe('wallet-1');
     expect(result.previousBalance).toBe(1000);
@@ -102,14 +109,20 @@ describe('WalletsService', () => {
   });
 
   it('rejects funding with amount less than or equal to zero', async () => {
-    await expect(service.fundWallet('user-1', 0)).rejects.toBeInstanceOf(
+    await expect(service.fundWallet('user-1', 0, undefined, 'fund-key-1')).rejects.toBeInstanceOf(
       BadRequestException,
     );
     expect(knexMock).not.toHaveBeenCalled();
   });
 
+  it('rejects funding when idempotency key is missing', async () => {
+    await expect(
+      service.fundWallet('user-1', 100, 'Top up'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('rejects funding with more than 2 decimal places', async () => {
-    await expect(service.fundWallet('user-1', 10.111)).rejects.toBeInstanceOf(
+    await expect(service.fundWallet('user-1', 10.111, undefined, 'fund-key-1')).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
@@ -122,7 +135,7 @@ describe('WalletsService', () => {
       status: 'frozen',
     });
 
-    await expect(service.fundWallet('user-1', 100)).rejects.toBeInstanceOf(
+    await expect(service.fundWallet('user-1', 100, undefined, 'fund-key-1')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
@@ -131,7 +144,7 @@ describe('WalletsService', () => {
     lockedWalletQueue.push(undefined);
 
     await expect(
-      service.fundWallet('missing-user', 500),
+      service.fundWallet('missing-user', 500, undefined, 'fund-key-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -144,7 +157,7 @@ describe('WalletsService', () => {
     });
     knexMock.transaction.mockRejectedValueOnce(new Error('DB write failed'));
 
-    await expect(service.fundWallet('user-1', 100)).rejects.toThrow(
+    await expect(service.fundWallet('user-1', 100, undefined, 'fund-key-1')).rejects.toThrow(
       'DB write failed',
     );
   });
@@ -157,7 +170,12 @@ describe('WalletsService', () => {
       status: 'active',
     });
 
-    const result = await service.withdrawWallet('user-1', 500, 'Bill payment');
+    const result = await service.withdrawWallet(
+      'user-1',
+      500,
+      'Bill payment',
+      'withdraw-key-1',
+    );
 
     expect(result.walletId).toBe('wallet-1');
     expect(result.previousBalance).toBe(1500);
@@ -192,7 +210,9 @@ describe('WalletsService', () => {
       status: 'active',
     });
 
-    await expect(service.withdrawWallet('user-1', 500)).rejects.toBeInstanceOf(
+    await expect(
+      service.withdrawWallet('user-1', 500, undefined, 'withdraw-key-1'),
+    ).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
@@ -205,7 +225,9 @@ describe('WalletsService', () => {
       status: 'frozen',
     });
 
-    await expect(service.withdrawWallet('user-1', 500)).rejects.toBeInstanceOf(
+    await expect(
+      service.withdrawWallet('user-1', 500, undefined, 'withdraw-key-1'),
+    ).rejects.toBeInstanceOf(
       ForbiddenException,
     );
   });
@@ -231,6 +253,7 @@ describe('WalletsService', () => {
       'user-2',
       1000,
       'P2P',
+      'transfer-key-1',
     );
 
     expect(result.transferGroupId).toBeTruthy();
@@ -262,9 +285,75 @@ describe('WalletsService', () => {
 
   it('rejects transfer to same user', async () => {
     await expect(
-      service.transferWallet('user-1', 'user-1', 100),
+      service.transferWallet('user-1', 'user-1', 100, undefined, 'transfer-key-1'),
     ).rejects.toThrow('Cannot transfer to same user');
     expect(knexMock.transaction).not.toHaveBeenCalled();
+  });
+
+  it('returns existing transfer result for duplicate idempotency key', async () => {
+    lockedWalletQueue.push(
+      {
+        id: 'wallet-sender',
+        user_id: 'user-1',
+        balance: 2000,
+        status: 'active',
+      },
+      {
+        id: 'wallet-recipient',
+        user_id: 'user-2',
+        balance: 1500,
+        status: 'active',
+      },
+    );
+
+    idempotentTransactionQueue.push(
+      {
+        id: 'tx-out',
+        wallet_id: 'wallet-sender',
+        type: 'transfer_out',
+        amount: 1000,
+        status: 'success',
+        reference: 'existing-out-ref',
+        idempotency_key: 'transfer-key-1',
+        group_id: 'group-1',
+      },
+      {
+        id: 'tx-in',
+        wallet_id: 'wallet-recipient',
+        type: 'transfer_in',
+        amount: 1000,
+        status: 'success',
+        reference: 'existing-in-ref',
+        idempotency_key: 'transfer-key-1',
+        group_id: 'group-1',
+      },
+    );
+
+    const result = await service.transferWallet(
+      'user-1',
+      'user-2',
+      1000,
+      'P2P',
+      'transfer-key-1',
+    );
+
+    expect(result).toEqual({
+      transferGroupId: 'group-1',
+      sender: {
+        walletId: 'wallet-sender',
+        previousBalance: 3000,
+        currentBalance: 2000,
+        transactionReference: 'existing-out-ref',
+      },
+      recipient: {
+        walletId: 'wallet-recipient',
+        previousBalance: 500,
+        currentBalance: 1500,
+        transactionReference: 'existing-in-ref',
+      },
+    });
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(insertMock).not.toHaveBeenCalled();
   });
 
   it('throws not found when recipient wallet does not exist', async () => {
@@ -279,7 +368,7 @@ describe('WalletsService', () => {
     );
 
     await expect(
-      service.transferWallet('user-1', 'user-2', 200),
+      service.transferWallet('user-1', 'user-2', 200, undefined, 'transfer-key-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -300,7 +389,7 @@ describe('WalletsService', () => {
     );
 
     await expect(
-      service.transferWallet('user-1', 'user-2', 300),
+      service.transferWallet('user-1', 'user-2', 300, undefined, 'transfer-key-1'),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -321,7 +410,7 @@ describe('WalletsService', () => {
     );
 
     await expect(
-      service.transferWallet('user-1', 'user-2', 100),
+      service.transferWallet('user-1', 'user-2', 100, undefined, 'transfer-key-1'),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
@@ -331,7 +420,7 @@ describe('WalletsService', () => {
     );
 
     await expect(
-      service.transferWallet('user-1', 'user-2', 50),
+      service.transferWallet('user-1', 'user-2', 50, undefined, 'transfer-key-1'),
     ).rejects.toThrow('Transfer write failed');
   });
 });

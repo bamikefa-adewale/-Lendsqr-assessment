@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { TransactionType } from '../enums/transaction-type.enum';
+import { TransactionStatus } from '../enums/transaction-status.enum';
 
 export class TransactionSwaggerDto {
   @ApiProperty()
@@ -14,8 +15,8 @@ export class TransactionSwaggerDto {
   @ApiProperty()
   amount: number;
 
-  @ApiProperty({ enum: ['pending', 'success', 'failed'] })
-  status: 'pending' | 'success' | 'failed';
+  @ApiProperty({ enum: TransactionStatus })
+  status: TransactionStatus;
 
   @ApiProperty()
   reference: string;

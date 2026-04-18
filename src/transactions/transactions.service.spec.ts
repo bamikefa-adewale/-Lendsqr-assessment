@@ -53,7 +53,7 @@ describe('TransactionsService', () => {
     });
 
     expect(result.meta.total).toBe(2);
-    expect(result.data).toHaveLength(2);
+    expect(result.items).toHaveLength(2);
   });
 
   it('gets transaction by reference for user', async () => {

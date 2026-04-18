@@ -25,7 +25,7 @@ describe('TransactionsController', () => {
 
   it('lists transactions for authenticated user', async () => {
     service.getAllUserTransactions.mockResolvedValue({
-      data: [{ reference: 'ref-1' }],
+      items: [{ reference: 'ref-1' }],
       meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
     });
 
@@ -39,7 +39,7 @@ describe('TransactionsController', () => {
       limit: 20,
     });
     expect(response.success).toBe(true);
-    expect(response.data).toHaveLength(1);
+    expect(response.data.items).toHaveLength(1);
   });
 
   it('gets transaction by reference for authenticated user', async () => {

@@ -33,7 +33,7 @@ export class TransactionsService {
         .first();
 
       const total = Number(countRow?.count ?? 0);
-      const data = await baseQuery
+      const items = await baseQuery
         .clone()
         .select('transactions.*')
         .orderBy('transactions.created_at', 'desc')
@@ -41,7 +41,7 @@ export class TransactionsService {
         .offset(offset);
 
       return {
-        data,
+        items,
         meta: {
           page,
           limit,

@@ -20,6 +20,7 @@ import {
   ListTransactionsSuccessSwaggerDto,
 } from './dto/transactions-swagger.dto';
 import { ErrorResponseSwaggerDto } from '../common/dto/error-response-swagger.dto';
+import { authorizationBearerHeader } from '../common/swagger/http-headers.doc';
 import { TransactionType } from './enums/transaction-type.enum';
 import { TransactionsService } from './transactions.service';
 
@@ -38,13 +39,7 @@ export class TransactionsController {
     description:
       'Returns paginated transactions for the authenticated user. Supports optional filters by transaction type and status.',
   })
-  @ApiBearerAuth('bearer')
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'Bearer access token',
-    example: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-  })
+  @ApiHeader(authorizationBearerHeader)
   @ApiQuery({
     name: 'page',
     required: false,
@@ -90,7 +85,7 @@ export class TransactionsController {
     this.logger.log(
       `List transactions request received for userId: ${userId} with query: ${JSON.stringify(query)}`,
     );
-    const data = await this.transactionsService.getAllUserTransactions(
+    const payload = await this.transactionsService.getAllUserTransactions(
       userId,
       query,
     );
@@ -98,7 +93,7 @@ export class TransactionsController {
     return {
       success: true,
       message: 'Transactions fetched successfully',
-      ...data,
+      data: payload,
     };
   }
 
@@ -109,13 +104,7 @@ export class TransactionsController {
     description:
       'Returns a single transaction belonging to the authenticated user by its unique reference.',
   })
-  @ApiBearerAuth('bearer')
-  @ApiHeader({
-    name: 'Authorization',
-    required: true,
-    description: 'Bearer access token',
-    example: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-  })
+  @ApiHeader(authorizationBearerHeader)
   @ApiParam({
     name: 'reference',
     type: String,

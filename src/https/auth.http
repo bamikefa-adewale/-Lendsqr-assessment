@@ -5,10 +5,10 @@ Content-Type: application/json
 
 {
 
-  "firstName": "fidelis",
-  "lastName": "osagie",
- "email": "fidelisa.test@example.com",
-  "phoneNumber": "+2349009442397",
+  "firstName": "delicious",
+  "lastName": "favour",
+ "email": "deliciousfavour.test@example.com",
+  "phoneNumber": "+2349002442397",
   "password": "hunter2hunter2"
 }
 

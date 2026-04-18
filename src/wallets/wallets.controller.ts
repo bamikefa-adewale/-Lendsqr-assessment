@@ -22,10 +22,15 @@ import {
   WithdrawWalletSuccessSwaggerDto,
 } from './dto/wallets-swagger.dto';
 import { ErrorResponseSwaggerDto } from '../common/dto/error-response-swagger.dto';
+import {
+  authorizationBearerHeader,
+  contentTypeJsonHeader,
+  idempotencyKeyHeader,
+} from '../common/swagger/http-headers.doc';
 import { WalletsService } from './providers/wallets.service';
 
 @ApiTags('wallets')
-@ApiBearerAuth()
+@ApiBearerAuth('bearer')
 @Controller('wallets')
 export class WalletsController {
   private readonly logger = new Logger(WalletsController.name);
@@ -47,12 +52,9 @@ export class WalletsController {
     description: 'Adds money to the authenticated user wallet balance.',
   })
   @ApiBody({ type: FundWalletDto })
-  @ApiHeader({
-    name: 'Idempotency-Key',
-    required: true,
-    description:
-      'Unique key per mutation request. Reuse same key to safely retry without duplicate processing.',
-  })
+  @ApiHeader(authorizationBearerHeader)
+  @ApiHeader(contentTypeJsonHeader)
+  @ApiHeader(idempotencyKeyHeader('wallet-fund-001'))
   @ApiOkResponse({
     description: 'Wallet funded successfully',
     type: FundWalletSuccessSwaggerDto,
@@ -100,12 +102,9 @@ export class WalletsController {
     description: 'Debits money from the authenticated user wallet balance.',
   })
   @ApiBody({ type: WithdrawWalletDto })
-  @ApiHeader({
-    name: 'Idempotency-Key',
-    required: true,
-    description:
-      'Unique key per mutation request. Reuse same key to safely retry without duplicate processing.',
-  })
+  @ApiHeader(authorizationBearerHeader)
+  @ApiHeader(contentTypeJsonHeader)
+  @ApiHeader(idempotencyKeyHeader('wallet-withdraw-001'))
   @ApiOkResponse({
     description: 'Wallet withdrawn successfully',
     type: WithdrawWalletSuccessSwaggerDto,
@@ -154,12 +153,9 @@ export class WalletsController {
       'Transfers money from the authenticated user wallet to another user wallet.',
   })
   @ApiBody({ type: TransferWalletDto })
-  @ApiHeader({
-    name: 'Idempotency-Key',
-    required: true,
-    description:
-      'Unique key per mutation request. Reuse same key to safely retry without duplicate processing.',
-  })
+  @ApiHeader(authorizationBearerHeader)
+  @ApiHeader(contentTypeJsonHeader)
+  @ApiHeader(idempotencyKeyHeader('wallet-transfer-001'))
   @ApiOkResponse({
     description: 'Transfer completed successfully',
     type: TransferWalletSuccessSwaggerDto,

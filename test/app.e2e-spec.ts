@@ -49,11 +49,11 @@ describe('Lending Wallet API (e2e)', () => {
       .send(identity)
       .expect(201);
 
-    createdUserIds.add(response.body.data.user.id);
+    createdUserIds.add(response.body.data.id);
 
     return {
-      id: response.body.data.user.id,
-      email: response.body.data.user.email,
+      id: response.body.data.id,
+      email: response.body.data.email,
       accessToken: response.body.data.accessToken,
     };
   };
@@ -109,7 +109,7 @@ describe('Lending Wallet API (e2e)', () => {
         .send(identity)
         .expect(201);
 
-      const userId = response.body.data.user.id;
+      const userId = response.body.data.id;
       createdUserIds.add(userId);
 
       expect(response.body).toEqual(
@@ -117,16 +117,12 @@ describe('Lending Wallet API (e2e)', () => {
           success: true,
           message: 'User registered successfully',
           data: expect.objectContaining({
-            success: true,
-            message: 'User registered successfully',
             accessToken: expect.any(String),
-            user: expect.objectContaining({
-              id: userId,
-              email: identity.email,
-              phoneNumber: identity.phoneNumber,
-              firstName: identity.firstName,
-              lastName: identity.lastName,
-            }),
+            id: userId,
+            email: identity.email,
+            phoneNumber: identity.phoneNumber,
+            firstName: identity.firstName,
+            lastName: identity.lastName,
           }),
         }),
       );
@@ -147,7 +143,7 @@ describe('Lending Wallet API (e2e)', () => {
         .send(identity)
         .expect(201);
 
-      createdUserIds.add(registerResponse.body.data.user.id);
+      createdUserIds.add(registerResponse.body.data.id);
 
       const response = await request(app.getHttpServer())
         .post(`${basePath}/auth/login`)

@@ -54,16 +54,12 @@ export class AuthService {
         user.email,
       );
       return {
-        success: true,
-        message: 'User registered successfully',
-        user: {
-          id: user.id,
-          email: user.email,
-          phoneNumber: user.phone_number,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          createdAt: user.created_at,
-        },
+        id: user.id,
+        email: user.email,
+        phoneNumber: user.phone_number,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        createdAt: user.created_at,
         accessToken,
       };
     } catch (error) {

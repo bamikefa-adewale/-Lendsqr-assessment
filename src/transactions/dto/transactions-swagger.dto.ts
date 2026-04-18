@@ -22,6 +22,9 @@ export class TransactionSwaggerDto {
   reference: string;
 
   @ApiProperty({ nullable: true })
+  idempotency_key: string | null;
+
+  @ApiProperty({ nullable: true })
   related_wallet_id: string | null;
 
   @ApiProperty({ nullable: true })
@@ -51,6 +54,14 @@ export class TransactionsMetaSwaggerDto {
   totalPages: number;
 }
 
+export class ListTransactionsDataSwaggerDto {
+  @ApiProperty({ type: [TransactionSwaggerDto] })
+  items: TransactionSwaggerDto[];
+
+  @ApiProperty({ type: TransactionsMetaSwaggerDto })
+  meta: TransactionsMetaSwaggerDto;
+}
+
 export class ListTransactionsSuccessSwaggerDto {
   @ApiProperty({ example: true })
   success: boolean;
@@ -58,11 +69,8 @@ export class ListTransactionsSuccessSwaggerDto {
   @ApiProperty({ example: 'Transactions fetched successfully' })
   message: string;
 
-  @ApiProperty({ type: [TransactionSwaggerDto] })
-  data: TransactionSwaggerDto[];
-
-  @ApiProperty({ type: TransactionsMetaSwaggerDto })
-  meta: TransactionsMetaSwaggerDto;
+  @ApiProperty({ type: ListTransactionsDataSwaggerDto })
+  data: ListTransactionsDataSwaggerDto;
 }
 
 export class GetTransactionSuccessSwaggerDto {

@@ -15,15 +15,6 @@ This project implements the core MVP for a lending wallet service:
 
 The goal of the implementation is not only to make endpoints work, but to keep money movement safe, testable, and easy to review.
 
-## Assessment Deliverables
-
-- Deployment URL: `TODO_ADD_DEPLOYMENT_URL`
-- GitHub repository URL: `TODO_ADD_REPOSITORY_URL`
-- Public review document: `TODO_ADD_PUBLIC_REVIEW_DOC_URL`
-- Loom video URL: `TODO_ADD_LOOM_VIDEO_URL`
-
-Replace the placeholders above before submission.
-
 ## Implemented MVP Features
 
 - User onboarding via `POST /auth/register`
@@ -43,6 +34,10 @@ Replace the placeholders above before submission.
 - `MySQL`
 - `Jest`
 - `Swagger`
+
+## Deployment
+
+The API is deployed on [Railway](https://railway.app/) using the **free tier**. The database is **Railway MySQL** (Railway’s managed MySQL). Use the MySQL service connection URL from the Railway dashboard as `MYSQL_URL` in your service variables.
 
 ## Implementation Approach
 
@@ -265,7 +260,7 @@ npm install
 
 Create the required environment variables for:
 
-- `MYSQL_URL`
+- `MYSQL_URL` (locally or on Railway: use the connection string from your Railway MySQL plugin/service)
 - `JWT_SECRET`
 - `JWT_TOKEN_AUDIENCE`
 - `JWT_TOKEN_ISSUER`

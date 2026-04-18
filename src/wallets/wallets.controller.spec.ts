@@ -1,7 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
+import type { Request } from 'express';
 import { WalletsController } from './wallets.controller';
 import { WalletsService } from './providers/wallets.service';
+
+function mockReq(idempotencyKey?: string): Request {
+  return {
+    headers: idempotencyKey
+      ? { 'idempotency-key': idempotencyKey }
+      : {},
+  } as Request;
+}
 
 describe('WalletsController', () => {
   let controller: WalletsController;
@@ -34,10 +43,14 @@ describe('WalletsController', () => {
       transactionReference: 'tx-ref',
     });
 
-    const response = await controller.fundWallet('user-1', {
-      amount: 500,
-      description: 'Top up',
-    }, 'fund-key-1');
+    const response = await controller.fundWallet(
+      'user-1',
+      {
+        amount: 500,
+        description: 'Top up',
+      },
+      mockReq('fund-key-1'),
+    );
 
     expect(walletsService.fundWallet).toHaveBeenCalledWith(
       'user-1',
@@ -65,10 +78,14 @@ describe('WalletsController', () => {
       transactionReference: 'tx-ref',
     });
 
-    const response = await controller.withdrawWallet('user-1', {
-      amount: 500,
-      description: 'Bill payment',
-    }, 'withdraw-key-1');
+    const response = await controller.withdrawWallet(
+      'user-1',
+      {
+        amount: 500,
+        description: 'Bill payment',
+      },
+      mockReq('withdraw-key-1'),
+    );
 
     expect(walletsService.withdrawWallet).toHaveBeenCalledWith(
       'user-1',
@@ -105,11 +122,15 @@ describe('WalletsController', () => {
       },
     });
 
-    const response = await controller.transferWallet('user-1', {
-      recipientUserId: 'user-2',
-      amount: 500,
-      description: 'Repayment',
-    }, 'transfer-key-1');
+    const response = await controller.transferWallet(
+      'user-1',
+      {
+        recipientUserId: 'user-2',
+        amount: 500,
+        description: 'Repayment',
+      },
+      mockReq('transfer-key-1'),
+    );
 
     expect(walletsService.transferWallet).toHaveBeenCalledWith(
       'user-1',
@@ -147,7 +168,7 @@ describe('WalletsController', () => {
           amount: 500,
           description: 'Top up',
         },
-        undefined,
+        mockReq(),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

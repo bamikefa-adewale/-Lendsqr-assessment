@@ -1,4 +1,12 @@
-import { BadRequestException, Body, Controller, Headers, Logger, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Logger,
+  Post,
+  Req,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
@@ -45,6 +53,13 @@ export class WalletsController {
     return normalized;
   }
 
+  /** Express lowercases header names; avoids duplicating `Idempotency-Key` in OpenAPI. */
+  private idempotencyKeyFromRequest(req: Request): string {
+    const raw = req.headers['idempotency-key'];
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return this.extractIdempotencyKey(value);
+  }
+
   @Post('fund')
   @Auth(AuthType.Bearer)
   @ApiOperation({
@@ -74,9 +89,9 @@ export class WalletsController {
   async fundWallet(
     @GetUserId() userId: string,
     @Body() dto: FundWalletDto,
-    @Headers('idempotency-key') idempotencyKey?: string,
+    @Req() req: Request,
   ) {
-    const requestIdempotencyKey = this.extractIdempotencyKey(idempotencyKey);
+    const requestIdempotencyKey = this.idempotencyKeyFromRequest(req);
     this.logger.log(
       `Fund wallet request received for userId: ${userId}, amount: ${dto.amount}`,
     );
@@ -124,9 +139,9 @@ export class WalletsController {
   async withdrawWallet(
     @GetUserId() userId: string,
     @Body() dto: WithdrawWalletDto,
-    @Headers('idempotency-key') idempotencyKey?: string,
+    @Req() req: Request,
   ) {
-    const requestIdempotencyKey = this.extractIdempotencyKey(idempotencyKey);
+    const requestIdempotencyKey = this.idempotencyKeyFromRequest(req);
     this.logger.log(
       `Withdraw wallet request received for userId: ${userId}, amount: ${dto.amount}`,
     );
@@ -175,9 +190,9 @@ export class WalletsController {
   async transferWallet(
     @GetUserId() userId: string,
     @Body() dto: TransferWalletDto,
-    @Headers('idempotency-key') idempotencyKey?: string,
+    @Req() req: Request,
   ) {
-    const requestIdempotencyKey = this.extractIdempotencyKey(idempotencyKey);
+    const requestIdempotencyKey = this.idempotencyKeyFromRequest(req);
     this.logger.log(
       `Transfer request received from userId: ${userId} to recipientUserId: ${dto.recipientUserId}, amount: ${dto.amount}`,
     );

@@ -37,9 +37,8 @@ Replace the placeholders above before submission.
 
 ## Tech Stack
 
-- `Node.js`
+- `Node.js(NestJS)`
 - `TypeScript`
-- `NestJS`
 - `Knex`
 - `MySQL`
 - `Jest`
@@ -64,7 +63,7 @@ For wallet operations, the application validates the amount, locks the relevant 
 
 ## Architecture Decisions And Rationale
 
-### NestJS for API structure
+### Nodejs (NestJS)for API structure
 
 `NestJS` was chosen to provide a modular backend structure, dependency injection, DTO validation, and a clean controller/service/provider split. This makes the project easier to extend and easier for reviewers to reason about.
 
@@ -78,7 +77,7 @@ For wallet operations, the application validates the amount, locks the relevant 
 
 ### JWT bearer-token authentication
 
-The API uses `@nestjs/jwt` to issue signed access tokens during registration and login. Each token carries the authenticated user identity in its payload, primarily `sub` as the user ID and `email`. Protected routes use a custom bearer-token guard to read the `Authorization: Bearer <token>` header, verify the JWT with the configured secret, issuer, and audience, and attach the decoded payload to the request. Controllers then access the authenticated user through `@GetUserId()`, which keeps wallet operations scoped to the current user without introducing a full session-based or OAuth-based authentication platform.
+The API uses `@nestjs/jwt` for access tokens. Tokens are verified with the configured secret, issuer, and audience before any protected handler runs. See **Security overview** below for how guards, public routes, and per-route auth metadata work together.
 
 ### Ledger-based wallet updates
 
@@ -96,19 +95,65 @@ Wallet rows are locked with `FOR UPDATE` during mutable operations. This reduces
 
 Transfers write two ledger rows, one for debit and one for credit, linked by a shared `group_id`. This makes paired transfer records easy to reconcile.
 
-## Security And Money-Movement Controls
+## Security overview
 
-- Bearer-auth protected wallet mutation routes
-- User-scoped wallet access via token claims through `@GetUserId()`
-- DTO validation with `class-validator`
-- Service-level defensive amount validation
-- Wallet status enforcement for mutable operations
-- Sufficient balance checks for withdraw and transfer
-- Self-transfer prevention
-- Unique transaction references via `randomUUID()`
-- Idempotent wallet mutations through required `Idempotency-Key` header
-- Database transaction scoping for wallet mutations
-- Row-level locking with `FOR UPDATE`
+This section summarizes how the API protects onboarding, authentication, and money movement. It matches what the code does today (guards, hashing, Karma lookup, validation, locks, and idempotency).
+
+### Authentication and route protection
+
+- **Global guard:** `AuthenticationGuard` is registered as `APP_GUARD`, so every route requires authentication **unless** it is explicitly opened.
+- **Public routes:** Handlers marked with `@Public()` skip authentication (for example root liveness and database health checks on `AppController`).
+- **Register and login:** `POST /auth/register` and `POST /auth/login` use `@Auth(AuthType.None)` so new users can sign up and existing users can log in without a token.
+- **Everything else:** Protected handlers use `@Auth(AuthType.Bearer)` (or rely on the default bearer requirement). The access-token guard reads `Authorization: Bearer <token>`, verifies the JWT, and attaches the payload to the request.
+- **Who is the caller:** Wallet and profile code uses `@GetUserId()` so operations always run as the user encoded in the token (`sub`), not as an arbitrary id from the body.
+
+### Passwords (never stored in plain text)
+
+- On register, passwords are hashed with **bcrypt** (per-password salt) before persisting `password_hash`.
+- On login, the submitted password is compared to the stored hash with bcrypt’s constant-time compare. Plain passwords are not written to the database or logs by design of this flow.
+
+### Onboarding and Karma (blacklist) identity
+
+- Before creating a user, the service checks **Adjutor Karma** using the registrant’s **email**.
+- The email is **normalized** (trimmed and lowercased) for consistent lookups.
+- When building the HTTP path to Karma, the identity segment is passed through `**encodeURIComponent`**, so characters that mean something in URLs (`@`, `+`, `%`, and so on) are safe and the provider receives the exact string you intended.
+
+### Request validation (shape and unknown fields)
+
+- A global `**ValidationPipe`** strips properties that are not on the DTO (`whitelist: true`), rejects requests with extra properties (`forbidNonWhitelisted: true`), and coerces types where appropriate (`transform: true`). That reduces “surprise” fields and basic injection of unexpected payloads.
+
+### Money movement: transactions, locks, and business rules
+
+- **Single database transaction:** Fund, withdraw, and transfer logic runs inside one Knex transaction so balance updates and ledger rows commit or roll back together.
+- **Row locking:** Wallet rows are selected with `**FOR UPDATE`** inside that transaction before balances change. That limits lost updates and race conditions when two requests touch the same wallet.
+- **Transfer locking order:** Transfers lock the sender’s wallet first, then the recipient’s. Under very high concurrency, cross transfers could still theoretically contend; see limitations below.
+- **Rules enforced on the locked row:** Active wallet only, valid amounts, sufficient balance for withdraw/transfer, and **no self-transfer**.
+- **Ledger:** Each movement creates transaction rows with a unique `**reference`** (`randomUUID()`). Transfers use a shared `**group_id`** so debit and credit pair cleanly.
+
+### Idempotency (retry-safe wallet mutations)
+
+- **Client header:** `POST /wallets/fund`, `POST /wallets/withdraw`, and `POST /wallets/transfer` require an `**Idempotency-Key`** header (non-empty after trim). Missing or blank keys are rejected.
+- **Server behavior:** The same key for the same wallet and operation type **replays the prior outcome** instead of performing the movement again. Keys are stored on ledger rows; the database enforces uniqueness on `(wallet_id, type, idempotency_key)`.
+- **Transfers:** Idempotency is applied to the **transfer-out** leg first; a replay returns the same paired references as the original transfer.
+
+### Configuration and secrets
+
+- Environment variables are validated at startup (Joi), including database URL, JWT settings, and Karma (Adjutor) credentials, so the app fails fast if secrets or URLs are missing.
+
+### Quick reference checklist
+
+
+| Concern            | What we do                                                         |
+| ------------------ | ------------------------------------------------------------------ |
+| Default for routes | Authenticate unless `@Public()` or `@Auth(None)`                   |
+| JWT                | Verify secret, issuer, audience; bearer header only                |
+| Passwords          | Bcrypt hash + compare                                              |
+| Karma email in URL | Normalize email, then `encodeURIComponent` in path                 |
+| Input              | DTO validation + whitelist / forbid extra fields                   |
+| Concurrency        | `FOR UPDATE` on wallets inside DB transactions                     |
+| Retries            | `Idempotency-Key` on all wallet mutations                          |
+| Integrity          | Atomic transactions; unique references; paired transfer `group_id` |
+
 
 ## API Endpoints
 
@@ -164,7 +209,9 @@ erDiagram
         uuid id PK
         uuid user_id FK
         decimal balance
+        string currency
         string status
+        int version
         datetime last_transaction_at
         datetime created_at
         datetime updated_at
@@ -178,6 +225,7 @@ erDiagram
         decimal amount
         string status
         string reference
+        string idempotency_key
         uuid group_id
         string description
         datetime created_at
@@ -254,21 +302,4 @@ npm test -- wallets.service.spec.ts wallets.controller.spec.ts
 - Amount precision is limited to two decimal places.
 - JWT bearer-token authentication is sufficient for the scope of this assessment.
 - Onboarding uses Adjutor Karma to determine blacklist eligibility.
-
-## Karma Identity Encoding Note
-
-Adjutor Karma identity checks use the identity in the URL path segment. Because emails may contain URL-reserved characters (for example `+`, `@`, `%`, `/`, `?`, `#`), the identity is URL-encoded before sending the request. This ensures the server receives the exact email value as one safe path segment.
-
-Example:
-
-- Raw: `john+test@gmail.com`
-- Safe in path: `john%2Btest%40gmail.com`
-
-If encoding is skipped, the provider can parse the identity incorrectly, which may lead to wrong lookup results or `4xx` responses.
-
-## Known Limitations / Future Improvements
-
-- Transfer lock ordering can be improved further to reduce deadlock risk under very high contention.
-- A full production authentication and authorization model is outside the current assessment scope.
-- README placeholders still need actual submission links before final delivery.
 
